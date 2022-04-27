@@ -1,4 +1,4 @@
-use node_template_runtime::{
+use vendeo_node_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, Signature, SudoConfig,
 	SystemConfig, WASM_BINARY,
 };
@@ -41,7 +41,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 
 	Ok(ChainSpec::from_genesis(
 		// Name
-		"Development",
+		"Vendeo Development",
 		// ID
 		"dev",
 		ChainType::Development,
@@ -81,7 +81,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 
 	Ok(ChainSpec::from_genesis(
 		// Name
-		"Local Testnet",
+		"Vendeo Local Testnet",
 		// ID
 		"local_testnet",
 		ChainType::Local,

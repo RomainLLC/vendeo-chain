@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
-		"Substrate Node".into()
+		"❣ Vendeo chain".into()
 	}
 
 	fn impl_version() -> String {

@@ -16,7 +16,7 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*};
+	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*, traits::Currency};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::AtLeast32BitUnsigned;
 	use sp_runtime::traits::Saturating;
@@ -29,6 +29,9 @@ pub mod pallet {
 		
 		// The type used to store balances.
 		type Balance: Member + Parameter + AtLeast32BitUnsigned + MaxEncodedLen + Default + Copy;
+
+		type Currency: Currency<Self::AccountId>; 
+
 	}
 
 	#[pallet::pallet]
@@ -53,6 +56,8 @@ pub(super) type BalanceToAccount<T: Config> = StorageMap<
 pub enum Event<T: Config> {
 	/// New token supply was minted.
 	MintedNewSupply(T::AccountId),
+	/// Token supply was burnt.
+	BurntSupply(T::AccountId),
 	/// Tokens were successfully transferred between accounts. [from, to, value]
 	Transferred(T::AccountId, T::AccountId, T::Balance),
 }
@@ -88,6 +93,40 @@ impl<T:Config> Pallet<T> {
 
 		// Emit an event.
 		Self::deposit_event(Event::MintedNewSupply(sender));
+		
+		// Return a successful DispatchResultWithPostInfo.
+		Ok(().into())
+	}
+
+
+	/// Burn an amount of tokens from any origin.
+	/// 
+	/// This would not make sense to have in practice in the current
+	/// implementation. This is an educational ressource.
+	/// 
+	/// Parameters:
+	/// - `amount`: The amount of tokens to mint.
+	///
+	/// Emits `Burntupply` event when successful.
+	///
+	/// TODO: Add safety checks and set max issuance allowed.  
+	/// Weight: `O(1)`	
+	#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+	pub fn burn(
+		origin: OriginFor<T>,
+		#[pallet::compact] amount: <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
+
+	) -> DispatchResultWithPostInfo {
+		
+		let sender = ensure_signed(origin)?;
+	
+		// Update storage.
+		//<BalanceToAccount<T>>::insert(&sender, -amount);
+		T::Currency::burn(amount);
+
+
+		// Emit an event.
+		Self::deposit_event(Event::BurntSupply(sender));
 		
 		// Return a successful DispatchResultWithPostInfo.
 		Ok(().into())

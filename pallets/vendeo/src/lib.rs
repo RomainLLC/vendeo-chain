@@ -16,7 +16,7 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*, traits::Currency};
+	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*, traits::Currency, traits::ExistenceRequirement};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::AtLeast32BitUnsigned;
 	use sp_runtime::traits::Saturating;
@@ -59,7 +59,7 @@ pub enum Event<T: Config> {
 	/// Token supply was burnt.
 	BurntSupply(T::AccountId),
 	/// Tokens were successfully transferred between accounts. [from, to, value]
-	Transferred(T::AccountId, T::AccountId, T::Balance),
+	Transferred(T::AccountId, T::AccountId, <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance),
 }
 
 #[pallet::hooks]
@@ -83,13 +83,13 @@ impl<T:Config> Pallet<T> {
 	#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 	pub fn mint(
 		origin: OriginFor<T>,
-		#[pallet::compact] amount: T::Balance
+		#[pallet::compact] amount: <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
 	) -> DispatchResultWithPostInfo {
 		
 		let sender = ensure_signed(origin)?;
 	
 		// Update storage.
-		<BalanceToAccount<T>>::insert(&sender, amount);
+		T::Currency::deposit_into_existing(&sender, amount)?;
 
 		// Emit an event.
 		Self::deposit_event(Event::MintedNewSupply(sender));
@@ -146,19 +146,19 @@ impl<T:Config> Pallet<T> {
 	pub fn transfer(
 		origin: OriginFor<T>,
 		to: T::AccountId,
-		#[pallet::compact] amount: T::Balance,
+		#[pallet::compact] amount: <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance,
 	) -> DispatchResultWithPostInfo {
 		let sender = ensure_signed(origin)?;
 		let sender_balance = Self::get_balance(&sender);
 		let receiver_balance = Self::get_balance(&to);
 
-		// Calculate new balances.
-		let update_sender = sender_balance.saturating_sub(amount);
-		let update_to = receiver_balance.saturating_add(amount);
 
-		// Update both accounts storage.
-		<BalanceToAccount<T>>::insert(&sender, update_sender);
-		<BalanceToAccount<T>>::insert(&to, update_to);
+        T::Currency::transfer(
+			&sender,
+			&to,
+			amount,
+			ExistenceRequirement::KeepAlive,
+	)?;
 
 		// Emit event.
 		Self::deposit_event(Event::Transferred(sender, to, amount));

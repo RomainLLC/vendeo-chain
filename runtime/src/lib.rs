@@ -279,11 +279,6 @@ impl pallet_vendeo::Config for Runtime {
 	type Balance = Balance;
 }
 
-// Configurable constants pallet.
-parameter_types! {
-    pub const MaxAddend: u32 = 1738;
-    pub const ClearFrequency: u32 = 10;
-}
 
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

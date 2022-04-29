@@ -16,87 +16,115 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*};
 	use frame_system::pallet_prelude::*;
+	use sp_runtime::traits::AtLeast32BitUnsigned;
+	use sp_runtime::traits::Saturating;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		
+		// The type used to store balances.
+		type Balance: Member + Parameter + AtLeast32BitUnsigned + MaxEncodedLen + Default + Copy;
 	}
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/v3/runtime/storage
-	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+/// Storage item for balances to accounts mapping.
+#[pallet::storage]
+#[pallet::getter(fn get_balance)]
+pub(super) type BalanceToAccount<T: Config> = StorageMap<
+	_, 
+	Blake2_128Concat, 
+	T::AccountId, 
+	T::Balance,
+	ValueQuery
+	>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/v3/runtime/events-and-errors
-	#[pallet::event]
-	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
+/// Token mint can emit two Event types.
+#[pallet::event]
+//#[pallet::metadata(T::AccountId = "AccountId")]
+#[pallet::generate_deposit(pub(super) fn deposit_event)]
+pub enum Event<T: Config> {
+	/// New token supply was minted.
+	MintedNewSupply(T::AccountId),
+	/// Tokens were successfully transferred between accounts. [from, to, value]
+	Transferred(T::AccountId, T::AccountId, T::Balance),
+}
+
+#[pallet::hooks]
+impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
+
+
+#[pallet::call]
+impl<T:Config> Pallet<T> {
+	/// Issue an amount of tokens from any origin.
+	/// 
+	/// This would not make sense to have in practice in the current
+	/// implementation. This is an educational ressource.
+	/// 
+	/// Parameters:
+	/// - `amount`: The amount of tokens to mint.
+	///
+	/// Emits `MintedNewSupply` event when successful.
+	///
+	/// TODO: Add safety checks and set max issuance allowed.  
+	/// Weight: `O(1)`	
+	#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+	pub fn mint(
+		origin: OriginFor<T>,
+		#[pallet::compact] amount: T::Balance
+	) -> DispatchResultWithPostInfo {
+		
+		let sender = ensure_signed(origin)?;
+	
+		// Update storage.
+		<BalanceToAccount<T>>::insert(&sender, amount);
+
+		// Emit an event.
+		Self::deposit_event(Event::MintedNewSupply(sender));
+		
+		// Return a successful DispatchResultWithPostInfo.
+		Ok(().into())
 	}
+	
+	/// Allow minting account to transfer a given balance to another account.
+	///
+	/// Parameters:
+	/// - `to`: The account to receive the transfer.
+	/// - `amount`: The amount of balance to transfer.
+	///
+	/// Emits `Transferred` event when successful.
+	///
+	/// TODO: Add checks on minimum balance required and maximum transferrable balance.  
+	/// Weight: `O(1)`	
+	#[pallet::weight(1_000)]
+	pub fn transfer(
+		origin: OriginFor<T>,
+		to: T::AccountId,
+		#[pallet::compact] amount: T::Balance,
+	) -> DispatchResultWithPostInfo {
+		let sender = ensure_signed(origin)?;
+		let sender_balance = Self::get_balance(&sender);
+		let receiver_balance = Self::get_balance(&to);
 
-	// Errors inform users that something went wrong.
-	#[pallet::error]
-	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
-	}
+		// Calculate new balances.
+		let update_sender = sender_balance.saturating_sub(amount);
+		let update_to = receiver_balance.saturating_add(amount);
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
-	#[pallet::call]
-	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/v3/runtime/origins
-			let who = ensure_signed(origin)?;
+		// Update both accounts storage.
+		<BalanceToAccount<T>>::insert(&sender, update_sender);
+		<BalanceToAccount<T>>::insert(&to, update_to);
 
-			// Update storage.
-			<Something<T>>::put(something);
-
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
-			// Return a successful DispatchResultWithPostInfo
-			Ok(())
-		}
-
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
-
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => Err(Error::<T>::NoneValue)?,
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
-		}
+		// Emit event.
+		Self::deposit_event(Event::Transferred(sender, to, amount));
+		Ok(().into())
 	}
 }
+}
+

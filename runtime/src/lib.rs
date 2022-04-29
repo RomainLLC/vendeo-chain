@@ -44,6 +44,10 @@ pub use sp_runtime::{Perbill, Permill};
 /// Import the template pallet.
 pub use pallet_template;
 
+// ********** VENDEO CUSTOM **********
+/// Import the vendeo.
+pub use pallet_vendeo;
+
 /// An index to a block.
 pub type BlockNumber = u32;
 
@@ -268,6 +272,20 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
+// ********** impl VENDEO *********
+// Configure pallet_vendeo
+impl pallet_vendeo::Config for Runtime {
+	type Event = Event;	
+	type Balance = Balance;
+}
+
+// Configurable constants pallet.
+parameter_types! {
+    pub const MaxAddend: u32 = 1738;
+    pub const ClearFrequency: u32 = 10;
+}
+
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -285,6 +303,7 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
+		VendeoCore: pallet_vendeo,
 	}
 );
 
@@ -330,6 +349,7 @@ mod benches {
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
 		[pallet_template, TemplateModule]
+		[pallet_vendeo, VendeoCore]
 	);
 }
 

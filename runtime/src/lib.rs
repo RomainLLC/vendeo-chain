@@ -6,19 +6,26 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-use pallet_grandpa::{
-	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
+
+use sp_std::{
+    prelude::*,
+    collections::btree_map::BTreeMap,
+};
+use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
+pub use vendeo_primitives::{AccountId, Signature, Balance, Index};
+use vendeo_primitives::{BlockNumber, Hash, Moment, currency::*, time::*};
+use sp_runtime::{
+    ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys,
+    transaction_validity::{TransactionValidity, TransactionSource},
+};
+use sp_runtime::traits::{
+    BlakeTwo256, Block as BlockT, NumberFor, AccountIdLookup
 };
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
-use sp_runtime::{
-	create_runtime_str, generic, impl_opaque_keys,
-	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Verify},
-	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, MultiSignature,
-};
-use sp_std::prelude::*;
+use pallet_grandpa::{AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList};
+use pallet_grandpa::fg_primitives;
+
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
@@ -29,7 +36,7 @@ pub use frame_support::{
 	traits::{ConstU128, ConstU32, ConstU8, KeyOwnerProofSystem, Randomness, StorageInfo, Currency},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
-		IdentityFee, Weight,
+		IdentityFee, Weight, DispatchClass,
 	},
 	StorageValue,
 };
@@ -45,27 +52,28 @@ pub use sp_runtime::{Perbill, Permill};
 pub use pallet_template;
 
 // ********** VENDEO CUSTOM **********
+
 /// Import the vendeo.
 pub use pallet_vendeo;
 
-/// An index to a block.
-pub type BlockNumber = u32;
+// /// An index to a block.
+// pub type BlockNumber = u32;
 
-/// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
-pub type Signature = MultiSignature;
+// /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
+// pub type Signature = MultiSignature;
 
-/// Some way of identifying an account on the chain. We intentionally make it equivalent
-/// to the public key of our transaction signing scheme.
-pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
+// /// Some way of identifying an account on the chain. We intentionally make it equivalent
+// /// to the public key of our transaction signing scheme.
+// pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
-/// Balance of an account.
-pub type Balance = u128;
+// /// Balance of an account.
+// pub type Balance = u128;
 
-/// Index of a transaction in the chain.
-pub type Index = u32;
+// /// Index of a transaction in the chain.
+// pub type Index = u32;
 
-/// A hash of some data used by the chain.
-pub type Hash = sp_core::H256;
+// /// A hash of some data used by the chain.
+// pub type Hash = sp_core::H256;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -240,23 +248,37 @@ impl pallet_timestamp::Config for Runtime {
 	type WeightInfo = ();
 }
 
+parameter_types! {
+	pub const ExistentialDeposit: u128 = 1 * CENTS;
+	pub const MaxLocks: u32 = 50;
+	pub const MaxReserves: u32 = 50;
+}
+
 impl pallet_balances::Config for Runtime {
-	type MaxLocks = ConstU32<50>;
-	type MaxReserves = ();
+	type MaxLocks = MaxLocks;
+	type MaxReserves = MaxReserves;
 	type ReserveIdentifier = [u8; 8];
 	/// The type for recording an account's balance.
 	type Balance = Balance;
 	/// The ubiquitous event type.
 	type Event = Event;
 	type DustRemoval = ();
-	type ExistentialDeposit = ConstU128<500>;
+	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = System;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 }
 
+parameter_types! {
+	pub const TransactionByteFee: Balance = 10 * MILLICENTS;
+    /// This value increases the priority of `Operational` transactions by adding
+    /// a "virtual tip" that's equal to the `OperationalFeeMultiplier * final_fee`.
+    pub OperationalFeeMultiplier: u8 = 5;
+}
+
 impl pallet_transaction_payment::Config for Runtime {
 	type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
-	type OperationalFeeMultiplier = ConstU8<5>;
+	// type TransactionByteFee = TransactionByteFee;
+	type OperationalFeeMultiplier = OperationalFeeMultiplier;
 	type WeightToFee = IdentityFee<Balance>;
 	type LengthToFee = IdentityFee<Balance>;
 	type FeeMultiplierUpdate = ();

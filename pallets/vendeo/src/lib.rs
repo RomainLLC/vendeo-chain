@@ -30,7 +30,8 @@ pub mod pallet {
 		// The type used to store balances.
 		type Balance: Member + Parameter + AtLeast32BitUnsigned + MaxEncodedLen + Default + Copy;
 
-		type Currency: Currency<Self::AccountId>; 
+		type Currency: Currency<Self::AccountId>;
+
 
 	}
 

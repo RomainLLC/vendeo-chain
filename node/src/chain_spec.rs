@@ -11,7 +11,6 @@ use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{sr25519, Pair, Public};
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{IdentifyAccount, Verify};
-
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
 
@@ -143,7 +142,7 @@ fn testnet_genesis(
 		},
 		balances: BalancesConfig {
 			// Configure endowed accounts with initial balance of 100.
-			balances: endowed_accounts.iter().cloned().map(|k| (k, 100 * EUROS)).collect(),
+			balances: endowed_accounts.iter().cloned().map(|k| (k, 1_000 * EUROS)).collect(),
 		},
 		aura: AuraConfig {
 			authorities: initial_authorities.iter().map(|x| (x.0.clone())).collect(),
@@ -162,7 +161,7 @@ fn testnet_genesis(
 pub fn vendeo_properties() -> Properties {
 	let mut properties = Properties::new();
 
-	properties.insert("ss58Format".into(), 85.into());
+	properties.insert("ss58Format".into(), 42.into());
 	properties.insert("tokenDecimals".into(), 11.into());
 	properties.insert("tokenSymbol".into(), "VENDEO".into());
 
